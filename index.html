@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>诗词Wordle小游戏</title>
+    <title>诗词Wordle小游戏（纯前端版）</title>
     <style>
         body { font-family: '微软雅黑', sans-serif; background: #f5f5f5; }
         .container { max-width: 480px; margin: 40px auto; background: #fff; padding: 24px; border-radius: 8px; box-shadow: 0 2px 8px #ccc; }
@@ -52,6 +52,8 @@ let answer = '';
 let currentAttempt = 0;
 let history = [];
 let isComposing = false;
+let wuyanList = [];
+let qiyanList = [];
 
 function getPoemLength(type) {
     return type === 'wuyan' ? 10 : 14;
@@ -92,6 +94,16 @@ function renderHistory() {
     document.getElementById('chance-info').innerHTML = `剩余机会：<b>${MAX_ATTEMPTS - currentAttempt}</b> / ${MAX_ATTEMPTS}`;
 }
 
+function getRandomPoem() {
+    if (poemType === 'wuyan') {
+        if (wuyanList.length === 0) return '';
+        return wuyanList[Math.floor(Math.random() * wuyanList.length)];
+    } else {
+        if (qiyanList.length === 0) return '';
+        return qiyanList[Math.floor(Math.random() * qiyanList.length)];
+    }
+}
+
 function resetGame() {
     answer = '';
     currentAttempt = 0;
@@ -103,15 +115,13 @@ function resetGame() {
     document.getElementById('guess-box').value = '';
     document.getElementById('guess-box').disabled = true;
     document.getElementById('chance-info').innerHTML = `剩余机会：<b>${MAX_ATTEMPTS}</b> / ${MAX_ATTEMPTS}`;
-    fetch(`/api/poem?type=${poemType}`)
-        .then(res => res.json())
-        .then(data => {
-            answer = data.poem;
-            showPoemInfo();
-            renderInputRow('');
-            document.getElementById('guess-box').disabled = false;
-            document.getElementById('submit').disabled = false;
-        });
+    setTimeout(() => {
+        answer = getRandomPoem();
+        showPoemInfo();
+        renderInputRow('');
+        document.getElementById('guess-box').disabled = false;
+        document.getElementById('submit').disabled = false;
+    }, 100);
 }
 
 document.querySelectorAll('input[name="type"]').forEach(radio => {
@@ -151,38 +161,74 @@ document.getElementById('submit').onclick = function() {
         document.getElementById('result').innerText = `请输入${answer.length}个字！`;
         return;
     }
-    fetch('/api/check', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ answer, guess })
-    })
-    .then(res => res.json())
-    .then(data => {
-        if (data.error) {
-            document.getElementById('result').innerText = data.error;
-            return;
-        }
-        history.push({ guess, result: data.result });
-        renderHistory();
-        document.getElementById('guess-box').value = '';
-        renderInputRow('');
-        currentAttempt++;
-        if (guess === answer) {
-            document.getElementById('result').innerHTML = `<span style='color:green;'>恭喜你，猜对了！</span><br>答案：${answer}`;
-            document.getElementById('submit').disabled = true;
-            document.getElementById('guess-box').disabled = true;
-        } else if (currentAttempt >= MAX_ATTEMPTS) {
-            document.getElementById('result').innerHTML = `<span style='color:red;'>很遗憾，机会用完！</span><br>答案：${answer}`;
-            document.getElementById('submit').disabled = true;
-            document.getElementById('guess-box').disabled = true;
-        }
-    });
+    const result = checkGuess(answer, guess);
+    history.push({ guess, result });
+    renderHistory();
+    document.getElementById('guess-box').value = '';
+    renderInputRow('');
+    currentAttempt++;
+    if (guess === answer) {
+        document.getElementById('result').innerHTML = `<span style='color:green;'>恭喜你，猜对了！</span><br>答案：${answer}`;
+        document.getElementById('submit').disabled = true;
+        document.getElementById('guess-box').disabled = true;
+    } else if (currentAttempt >= MAX_ATTEMPTS) {
+        document.getElementById('result').innerHTML = `<span style='color:red;'>很遗憾，机会用完！</span><br>答案：${answer}`;
+        document.getElementById('submit').disabled = true;
+        document.getElementById('guess-box').disabled = true;
+    }
 };
 
-// 启动时不自动开始，需点击“再来一局”
-window.onload = function() {
+function checkGuess(answer, guess) {
+    // Wordle判定算法
+    const result = [];
+    const answerChars = answer.split('');
+    const guessChars = guess.split('');
+    const used = Array(answerChars.length).fill(false);
+    // 先标记绿色
+    for (let i = 0; i < guessChars.length; i++) {
+        if (guessChars[i] === answerChars[i]) {
+            result[i] = 'green';
+            used[i] = true;
+        } else {
+            result[i] = '';
+        }
+    }
+    // 再标记黄色和灰色
+    for (let i = 0; i < guessChars.length; i++) {
+        if (result[i] === 'green') continue;
+        let found = false;
+        for (let j = 0; j < answerChars.length; j++) {
+            if (!used[j] && guessChars[i] === answerChars[j]) {
+                found = true;
+                used[j] = true;
+                break;
+            }
+        }
+        result[i] = found ? 'yellow' : 'gray';
+    }
+    return result;
+}
+
+// 加载诗句数据并初始化
+async function loadDataAndStart() {
+    try {
+        const wuyanResp = await fetch('./wuyan.json');
+        wuyanList = await wuyanResp.json();
+    } catch (e) {
+        alert('无法加载 wuyan.json');
+        wuyanList = [];
+    }
+    try {
+        const qiyanResp = await fetch('./qiyan.json');
+        qiyanList = await qiyanResp.json();
+    } catch (e) {
+        alert('无法加载 qiyan.json');
+        qiyanList = [];
+    }
     resetGame();
-};
+}
+
+window.onload = loadDataAndStart;
 </script>
 </body>
 </html> 
