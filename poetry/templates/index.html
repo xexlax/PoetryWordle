@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>诗词Wordle小游戏</title>
+    <style>
+        body { font-family: '微软雅黑', sans-serif; background: #f5f5f5; }
+        .container { max-width: 480px; margin: 40px auto; background: #fff; padding: 24px; border-radius: 8px; box-shadow: 0 2px 8px #ccc; }
+        h2 { text-align: center; }
+        .poem-info { margin: 12px 0; text-align: center; }
+        .guess-row { display: flex; justify-content: center; margin-bottom: 8px; }
+        .cell {
+            width: 36px; height: 36px; border: 2px solid #bbb; margin: 2px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 24px; font-weight: bold; background: #fff; border-radius: 4px;
+            transition: background 0.2s;
+        }
+        .cell.green { background: #43a047; color: #fff; border-color: #388e3c; }
+        .cell.yellow { background: #fbc02d; color: #fff; border-color: #f9a825; }
+        .cell.gray { background: #bdbdbd; color: #fff; border-color: #757575; }
+        .input-row { display: flex; justify-content: center; margin-bottom: 12px; }
+        .input-box {
+            width: 100%; max-width: 400px; height: 36px; font-size: 24px; text-align: left;
+            margin: 0 auto 12px auto; display: block; border: 2px solid #2196f3; border-radius: 4px; padding: 0 8px;
+        }
+        .btn { width: 100%; padding: 10px; background: #4caf50; color: #fff; border: none; border-radius: 4px; font-size: 18px; cursor: pointer; margin-top: 8px; }
+        .btn:disabled { background: #aaa; }
+        .select-type { margin-bottom: 16px; text-align: center; }
+        .result { margin-top: 16px; text-align: center; font-size: 18px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h2>诗词 Wordle 小游戏</h2>
+    <div class="select-type">
+        <label><input type="radio" name="type" value="wuyan" checked> 五言诗句</label>
+        <label><input type="radio" name="type" value="qiyan"> 七言诗句</label>
+        <button class="btn" id="new-poem">再来一局</button>
+    </div>
+    <div class="poem-info" id="poem-info"></div>
+    <div id="chance-info" style="text-align:center;margin-bottom:8px;"></div>
+    <div id="history"></div>
+    <input class="input-box" id="guess-box" placeholder="请输入完整诗句" maxlength="14" disabled autocomplete="off">
+    <div class="input-row" id="input-row"></div>
+    <button class="btn" id="submit" disabled>提交</button>
+    <div class="result" id="result"></div>
+</div>
+<script>
+const MAX_ATTEMPTS = 20;
+let poemType = 'wuyan';
+let answer = '';
+let currentAttempt = 0;
+let history = [];
+let isComposing = false;
+
+function getPoemLength(type) {
+    return type === 'wuyan' ? 10 : 14;
+}
+
+function showPoemInfo() {
+    const info = document.getElementById('poem-info');
+    info.innerHTML = `本局为 <b>${poemType==='wuyan'?'五言诗句':'七言诗句'}</b>，共 <b>${getPoemLength(poemType)}</b> 字。`;
+    document.getElementById('chance-info').innerHTML = `剩余机会：<b>${MAX_ATTEMPTS - currentAttempt}</b> / ${MAX_ATTEMPTS}`;
+}
+
+function renderInputRow(guess) {
+    const row = document.getElementById('input-row');
+    row.innerHTML = '';
+    const len = getPoemLength(poemType);
+    for (let i = 0; i < len; i++) {
+        const cell = document.createElement('div');
+        cell.className = 'cell';
+        cell.innerText = guess[i] || '';
+        row.appendChild(cell);
+    }
+}
+
+function renderHistory() {
+    const historyDiv = document.getElementById('history');
+    historyDiv.innerHTML = '';
+    for (const item of history) {
+        const row = document.createElement('div');
+        row.className = 'guess-row';
+        for (let i = 0; i < item.guess.length; i++) {
+            const cell = document.createElement('div');
+            cell.className = 'cell ' + item.result[i];
+            cell.innerText = item.guess[i];
+            row.appendChild(cell);
+        }
+        historyDiv.appendChild(row);
+    }
+    document.getElementById('chance-info').innerHTML = `剩余机会：<b>${MAX_ATTEMPTS - currentAttempt}</b> / ${MAX_ATTEMPTS}`;
+}
+
+function resetGame() {
+    answer = '';
+    currentAttempt = 0;
+    history = [];
+    document.getElementById('result').innerText = '';
+    document.getElementById('submit').disabled = true;
+    document.getElementById('input-row').innerHTML = '';
+    document.getElementById('history').innerHTML = '';
+    document.getElementById('guess-box').value = '';
+    document.getElementById('guess-box').disabled = true;
+    document.getElementById('chance-info').innerHTML = `剩余机会：<b>${MAX_ATTEMPTS}</b> / ${MAX_ATTEMPTS}`;
+    fetch(`/api/poem?type=${poemType}`)
+        .then(res => res.json())
+        .then(data => {
+            answer = data.poem;
+            showPoemInfo();
+            renderInputRow('');
+            document.getElementById('guess-box').disabled = false;
+            document.getElementById('submit').disabled = false;
+        });
+}
+
+document.querySelectorAll('input[name="type"]').forEach(radio => {
+    radio.addEventListener('change', e => {
+        poemType = e.target.value;
+        resetGame();
+    });
+});
+
+document.getElementById('new-poem').onclick = resetGame;
+
+document.getElementById('guess-box').addEventListener('compositionstart', function() {
+    isComposing = true;
+});
+document.getElementById('guess-box').addEventListener('compositionend', function(e) {
+    isComposing = false;
+    let val = e.target.value.replace(/\s/g, '');
+    if (val.length > getPoemLength(poemType)) {
+        val = val.slice(0, getPoemLength(poemType));
+        e.target.value = val;
+    }
+    renderInputRow(val);
+});
+document.getElementById('guess-box').addEventListener('input', function() {
+    if (isComposing) return;
+    let val = this.value.replace(/\s/g, '');
+    if (val.length > getPoemLength(poemType)) {
+        val = val.slice(0, getPoemLength(poemType));
+        this.value = val;
+    }
+    renderInputRow(val);
+});
+
+document.getElementById('submit').onclick = function() {
+    const guess = document.getElementById('guess-box').value.replace(/\s/g, '');
+    if (guess.length !== answer.length) {
+        document.getElementById('result').innerText = `请输入${answer.length}个字！`;
+        return;
+    }
+    fetch('/api/check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ answer, guess })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.error) {
+            document.getElementById('result').innerText = data.error;
+            return;
+        }
+        history.push({ guess, result: data.result });
+        renderHistory();
+        document.getElementById('guess-box').value = '';
+        renderInputRow('');
+        currentAttempt++;
+        if (guess === answer) {
+            document.getElementById('result').innerHTML = `<span style='color:green;'>恭喜你，猜对了！</span><br>答案：${answer}`;
+            document.getElementById('submit').disabled = true;
+            document.getElementById('guess-box').disabled = true;
+        } else if (currentAttempt >= MAX_ATTEMPTS) {
+            document.getElementById('result').innerHTML = `<span style='color:red;'>很遗憾，机会用完！</span><br>答案：${answer}`;
+            document.getElementById('submit').disabled = true;
+            document.getElementById('guess-box').disabled = true;
+        }
+    });
+};
+
+// 启动时不自动开始，需点击“再来一局”
+window.onload = function() {
+    resetGame();
+};
+</script>
+</body>
+</html> 
