@@ -157,9 +157,11 @@ document.getElementById('guess-box').addEventListener('input', function() {
 });
 
 document.getElementById('submit').onclick = function() {
-    const guess = document.getElementById('guess-box').value.replace(/\s/g, '');
+    const rawInput = document.getElementById('guess-box').value;
+    const hanziArr = rawInput.match(/[\u4e00-\u9fa5]/g) || [];
+    const guess = hanziArr.join('');
     if (guess.length !== answer.length) {
-        document.getElementById('result').innerText = `请输入${answer.length}个字！`;
+        document.getElementById('result').innerText = `请输入${answer.length}个汉字！`;
         return;
     }
     const result = checkGuess(answer, guess);
