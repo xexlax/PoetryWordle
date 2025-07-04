@@ -43,6 +43,7 @@
     <input class="input-box" id="guess-box" placeholder="请输入完整诗句" maxlength="14" disabled autocomplete="off">
     <div class="input-row" id="input-row"></div>
     <button class="btn" id="submit" disabled>提交</button>
+    <button class="btn" id="giveup" style="background:#e53935;">放弃</button>
     <div class="result" id="result"></div>
 </div>
 <script>
@@ -138,7 +139,7 @@ document.getElementById('guess-box').addEventListener('compositionstart', functi
 });
 document.getElementById('guess-box').addEventListener('compositionend', function(e) {
     isComposing = false;
-    let val = e.target.value.replace(/\s/g, '');
+    let val = e.target.value.replace(/[\s,，]/g, '');
     if (val.length > getPoemLength(poemType)) {
         val = val.slice(0, getPoemLength(poemType));
         e.target.value = val;
@@ -147,7 +148,7 @@ document.getElementById('guess-box').addEventListener('compositionend', function
 });
 document.getElementById('guess-box').addEventListener('input', function() {
     if (isComposing) return;
-    let val = this.value.replace(/\s/g, '');
+    let val = this.value.replace(/[\s,，]/g, '');
     if (val.length > getPoemLength(poemType)) {
         val = val.slice(0, getPoemLength(poemType));
         this.value = val;
@@ -176,6 +177,12 @@ document.getElementById('submit').onclick = function() {
         document.getElementById('submit').disabled = true;
         document.getElementById('guess-box').disabled = true;
     }
+};
+
+document.getElementById('giveup').onclick = function() {
+    document.getElementById('result').innerHTML = `<span style='color:#e53935;'>已放弃，本局答案：</span><br>${answer}`;
+    document.getElementById('submit').disabled = true;
+    document.getElementById('guess-box').disabled = true;
 };
 
 function checkGuess(answer, guess) {
